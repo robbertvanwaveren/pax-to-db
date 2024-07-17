@@ -81,7 +81,7 @@ async fn download_req(
         .await
         .unwrap();
     let resp = assert_ok(resp).await;
-    println!("received {} bytes", resp.content_length().unwrap_or(0));
+    println!("received download headers {:?}", resp.headers());
     return resp.bytes_stream();
 }
 
