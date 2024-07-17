@@ -79,6 +79,7 @@ async fn open(manager: web::Data<ExitSessionManager>) -> Vec<u8> {
         }
     };
     let uid = Uuid::new_v4();
+    println!("successfully connected new session {} to target {}", uid, manager.target_addr[0]);
     let mut guard = manager.sessions.write().await;
     guard.insert(uid, ExitSession::new(stream));
     return uid.into_bytes().to_vec();
