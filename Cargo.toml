@@ -1,5 +1,5 @@
 [package]
-name = "tcp-over-http"
+name = "pax-to-docdb"
 version = "0.1.0"
 edition = "2021"
 
