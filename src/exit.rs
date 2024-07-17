@@ -1,11 +1,12 @@
 use crate::artex;
 use crate::{ouroboros_impl_wrapper::WrapperBuilder, Artex};
 use actix_web::dev::Server;
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, HttpRequest};
 use anyhow::anyhow;
 use futures::stream::TryStreamExt;
 use halfbrown::HashMap as Map;
 use std::net::SocketAddr;
+use actix_web::http::StatusCode;
 use stream_cancel::{Trigger, Valve};
 use tokio::{net::TcpStream, sync::RwLock};
 use tokio_util::codec::{BytesCodec, FramedRead};
@@ -83,6 +84,14 @@ async fn open(manager: web::Data<ExitSessionManager>) -> Vec<u8> {
     let mut guard = manager.sessions.write().await;
     guard.insert(uid, ExitSession::new(stream));
     return uid.into_bytes().to_vec();
+}
+#[get("/")]
+async fn root(req: HttpRequest) -> HttpResponse {
+    let entity = req.headers().get("authorization").map_or("unknown entity", |h| h.to_str().unwrap());
+    println!("received request from: {}", entity);
+    HttpResponse::build(StatusCode::OK)
+        .content_type("text/html; charset=utf-8")
+        .body("<html><body><h1>Check your browser dev-tools for your envoy-session cookie</h1></body></html>")
 }
 
 #[post("/upload/{uid_s}")]
@@ -179,6 +188,7 @@ pub fn main(bind_addr: &[SocketAddr], target_addr: Vec<SocketAddr>) -> (Vec<Sock
             .service(open)
             .service(upload)
             .service(download)
+            .service(root)
             .service(close)
     })
     .bind(bind_addr)
