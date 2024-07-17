@@ -81,6 +81,7 @@ async fn download_req(
         .await
         .unwrap();
     let resp = assert_ok(resp).await;
+    println!("received {} bytes", resp.content_length().unwrap_or(0));
     return resp.bytes_stream();
 }
 
@@ -218,9 +219,6 @@ pub(crate) static AC: std::sync::atomic::AtomicUsize = std::sync::atomic::Atomic
 
 #[track_caller]
 fn assert_ok(resp: Response) -> impl std::future::Future<Output = Response> {
-    #[cfg(feature = "rustc_stable")]
-    return async move { resp };
-    #[cfg(not(feature = "rustc_stable"))]
     {
         let blame_caller = std::intrinsics::caller_location();
         async move {

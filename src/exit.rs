@@ -100,6 +100,7 @@ async fn upload(
     uid_s: web::Path<String>,
     http_receive_data: web::Payload,
 ) -> impl Responder {
+    println!("upload of {uid_s}");
     let (guard, stop_copy) = {
         let uid = Uuid::parse_str(&uid_s).unwrap();
         let guard = manager.sessions.read().await;
@@ -138,6 +139,7 @@ async fn download(
     manager: web::Data<ExitSessionManager>,
     uid_s: web::Path<String>,
 ) -> impl Responder {
+    println!("download of {uid_s}");
     let (guard, valve) = {
         let uid = Uuid::parse_str(&uid_s).unwrap();
         let guard = manager.sessions.read().await;
@@ -164,7 +166,7 @@ async fn download(
 #[get("/close/{uid_s}")]
 async fn close(manager: web::Data<ExitSessionManager>, uid_s: web::Path<String>) -> impl Responder {
     let uid = Uuid::parse_str(&uid_s).unwrap();
-    println!("Close session {uid:#x?}");
+    println!("close {uid_s}");
     let mut guard = manager.sessions.write().await;
     let sess = guard
         .remove(&uid)
