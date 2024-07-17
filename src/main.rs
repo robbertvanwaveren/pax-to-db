@@ -4,9 +4,7 @@
     feature(
         core_intrinsics,
         auto_traits,
-        negative_impls,
-        panic_internals,
-        panic_info_message
+        negative_impls
     )
 )]
 #![allow(clippy::needless_return)]
@@ -57,8 +55,7 @@ enum CommandMode {
         /// URL of the exit node.
         #[clap(short, long, value_parser)]
         target_url: Url,
-        #[clap(short, long, value_parser)]
-        req_headers: Vec<String>,
+
         #[clap(short, long, value_parser)]
         envoy_session: String,
     },
@@ -116,10 +113,9 @@ async fn main() {
         CommandMode::Entry {
             bind_addr,
             target_url,
-            req_headers,
             envoy_session
         } => {
-            entry::main(&bind_addr.resolve().await, target_url, req_headers, envoy_session)
+            entry::main(&bind_addr.resolve().await, target_url, envoy_session)
                 .await
                 .1
                 .await;

@@ -3,7 +3,6 @@ use std::{
     panic::Location,
 };
 
-use anyhow::anyhow;
 use derivative::Derivative;
 
 fn to_string_fmt<T: ToString>(t: &T, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -28,22 +27,6 @@ impl TraceError {
 }
 
 pub(crate) type Trace<T> = Result<T, TraceError>;
-
-pub(crate) trait TraceExt {
-    type Output;
-    fn trace(self) -> Result<Self::Output, TraceError>;
-}
-
-impl<T> TraceExt for Option<T> {
-    type Output = T;
-    #[track_caller]
-    fn trace(self) -> Result<Self::Output, TraceError> {
-        match self {
-            Some(x) => Ok(x),
-            None => Err(TraceError::from(anyhow!("NoneError"))),
-        }
-    }
-}
 
 pub(crate) trait ContextExt {
     type Output;

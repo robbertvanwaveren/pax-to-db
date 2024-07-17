@@ -32,7 +32,7 @@ async fn init_http_session(target: &Url, envoy_session: &String) -> Trace<Uuid> 
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert("key", "value".try_into().unwrap());
 
-    let mut req = CLIENT.get(join_url(target, ["open"]))
+    let req = CLIENT.get(join_url(target, ["open"]))
         .header("Cookie", format!("envoy-session={}", envoy_session));
     println!("using envoy-session: {}", envoy_session);
 
@@ -161,7 +161,6 @@ async fn process_socket(target_url: Arc<Url>, envoy_session: Arc<String>, socket
 pub async fn main(
     bind_addr: &[SocketAddr],
     target_url: Url,
-    req_headers: Vec<String>,
     envoy_session: String,
 ) -> (SocketAddr, impl Future<Output = Infallible>) {
     //console_subscriber::init();
