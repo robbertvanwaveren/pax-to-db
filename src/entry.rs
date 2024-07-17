@@ -9,6 +9,7 @@ use std::convert::{identity, Infallible, TryInto};
 use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use reqwest::redirect::Policy;
 use stream_cancel::Valve;
 use tokio::net::TcpListener;
 use tokio_stream::StreamExt;
@@ -17,21 +18,19 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 lazy_static::lazy_static! {
-    pub(crate) static ref CLIENT: Client = Client::new();
+    pub(crate) static ref CLIENT: Client = Client::builder().redirect(Policy::none()).build().unwrap();
 }
 
-async fn close_session(target: &Url, uid: Uuid) {
+async fn close_session(target: &Url, envoy_session: &String, uid: Uuid) {
     let resp = CLIENT
         .get(join_url(target, ["close/", &uid.to_string()]))
+        .header("Cookie", format!("envoy-session={}", envoy_session))
         .send()
         .await
         .unwrap();
     assert_ok(resp).await;
 }
 async fn init_http_session(target: &Url, envoy_session: &String) -> Trace<Uuid> {
-    let mut headers = reqwest::header::HeaderMap::new();
-    headers.insert("key", "value".try_into().unwrap());
-
     let req = CLIENT.get(join_url(target, ["open"]))
         .header("Cookie", format!("envoy-session={}", envoy_session));
     println!("using envoy-session: {}", envoy_session);
@@ -53,7 +52,7 @@ async fn init_http_session(target: &Url, envoy_session: &String) -> Trace<Uuid> 
     ));
 }
 
-async fn upload_req<S>(target: &Url, uid: Uuid, data: S)
+async fn upload_req<S>(target: &Url, envoy_session: &String, uid: Uuid, data: S)
 where
     S: futures::TryStream + Send + Sync + 'static,
     S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
@@ -61,6 +60,7 @@ where
 {
     let resp = CLIENT
         .post(join_url(target, ["upload/", &uid.to_string()]))
+        .header("Cookie", format!("envoy-session={}", envoy_session))
         .body(Body::wrap_stream(data))
         .send()
         .await
@@ -71,10 +71,12 @@ where
 
 async fn download_req(
     target: &Url,
+    envoy_session: &String,
     uid: Uuid,
 ) -> impl futures::Stream<Item = reqwest::Result<Bytes>> {
     let resp = CLIENT
         .get(join_url(target, ["download/", &uid.to_string()]))
+        .header("Cookie", format!("envoy-session={}", envoy_session))
         .send()
         .await
         .unwrap();
@@ -84,7 +86,7 @@ async fn download_req(
 
 async fn process_socket(target_url: Arc<Url>, envoy_session: Arc<String>, socket: tokio::net::TcpStream) -> Trace<Uuid> {
     let uid = init_http_session(&target_url, &envoy_session).await?;
-    println!("HTTP Server copies. Established session {uid:#x?}");
+    println!("Established session {uid:#x?}");
 
     let (s_read, mut s_write) = socket.into_split();
 
@@ -94,6 +96,7 @@ async fn process_socket(target_url: Arc<Url>, envoy_session: Arc<String>, socket
     let upload_join = {
         let stop_download = stop_download.clone();
         let target_url = target_url.clone();
+        let envoy_session = envoy_session.clone();
         let s_read = artex(s_read);
         async move {
             #[allow(clippy::never_loop)]
@@ -112,7 +115,7 @@ async fn process_socket(target_url: Arc<Url>, envoy_session: Arc<String>, socket
                     }
                 });
                 let stream = valve.wrap(stream);
-                upload_req(&target_url, uid, stream).await;
+                upload_req(&target_url, &envoy_session, uid, stream).await;
                 //200
                 break;
             }
@@ -122,13 +125,14 @@ async fn process_socket(target_url: Arc<Url>, envoy_session: Arc<String>, socket
 
     let download_join = {
         let target_url = target_url.clone();
+        let envoy_session = envoy_session.clone();
         async move {
             #[allow(clippy::never_loop)]
             loop {
                 use futures::TryStreamExt;
                 use tokio_util::compat::FuturesAsyncReadCompatExt;
 
-                let s = download_req(&target_url, uid).await;
+                let s = download_req(&target_url, &envoy_session, uid).await;
                 let mut r = s
                     .map_while(|x| match x {
                         Ok(x) => Some(Ok(x)),
@@ -154,7 +158,7 @@ async fn process_socket(target_url: Arc<Url>, envoy_session: Arc<String>, socket
     let download_join = tokio::spawn(download_join);
     upload_join.await.unwrap();
     download_join.await.unwrap();
-    close_session(&target_url, uid).await;
+    close_session(&target_url, &envoy_session, uid).await;
     return Ok(uid);
 }
 
