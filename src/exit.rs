@@ -159,8 +159,10 @@ async fn download(
     }
     .build();
     let stream = valve.wrap(stream);
-    //BytesMut -> Bytes
-    return HttpResponse::Ok().streaming(stream.map_ok(Into::into));
+    //BytesMut -> Bytess
+    //return HttpResponse::Ok().streaming(stream.map_ok(Into::into));
+    let result = stream.try_concat().await.unwrap();
+    return HttpResponse::Ok().body(result);
 }
 
 #[get("/close/{uid_s}")]
